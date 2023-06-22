@@ -5,6 +5,7 @@ import time
 from PIL import Image, ImageTk
 
 import serial.tools.list_ports
+import serial
 
 
 class GUI:
@@ -21,8 +22,9 @@ class GUI:
         self.root.mainloop()
 
 
-    def receive_msg(self):
-        with can.Bus(interface='serial', channel=self.COM_PORT, bitrate=250000) as bus:
+    def receive_can_msg(self):
+        # untested
+        with can.Bus(interface='serial', channel=self.COM_PORT, bitrate=115200) as bus:
             printer = can.Printer()
             logger = can.Logger('dane.txt')
             buffer_reader = can.BufferedReader()
@@ -37,10 +39,10 @@ class GUI:
             # buffer_reader.stop()
             while True:
                 self.root.update()
-                print('xd')
                 if ctr % 3 == 0:
                     self.IR_data = self.msg
                     self.IR_data_string.set(str(self.IR_data))
+
                     if not isinstance(self.IR_data, int) or not self.IR_data:
                         try: self.IR_green.destroy()
                         except: pass
@@ -69,7 +71,33 @@ class GUI:
                     self.msg = buffer_reader.get_message()
                 except:
                     bus.shutdown()
+    def receive_uart_msg(self):
 
+        with serial.Serial(self.COM_PORT, 115200, timeout=1) as ser:
+            while True:
+                self.root.update()
+                self.msg = str(ser.readline()).split(' ')
+                if self.msg[0] == "b'16":
+                    # self.IR_data = int(self.msg[1][:1])
+                    self.IR_data = 1
+                    self.IR_data_string.set(str(self.IR_data))
+                    self.IR_red = tk.Label(self.data_frame, image=self.red_circle)
+                    self.IR_red.grid(row=2, column=1, ipadx=20, ipady=20)
+                    if not isinstance(self.IR_data, int) or not self.IR_data:
+                        self.IR_red.config(image=self.red_circle)
+
+                    else:
+                        self.IR_red.config(image=self.green_circle)
+
+                elif self.msg[0] == "b'5":
+                    self.US_data = int(self.msg[1][:-5])
+                    self.US_data_string.set(str(self.US_data))
+                    self.US_red = tk.Label(self.data_frame, image=self.red_circle)
+                    self.US_red.grid(row=2, column=0, ipadx=20, ipady=20)
+                    if not isinstance(self.US_data, int) or self.US_data < 100:
+                        self.US_red.config(image=self.red_circle)
+                    else:
+                        self.US_red.config(image=self.green_circle)
 
     def startup_page(self):
 
@@ -105,21 +133,8 @@ class GUI:
         self.red_circle = ImageTk.PhotoImage(red_img)
         self.green_circle = ImageTk.PhotoImage(green_img)
 
-        # self.red = tk.Label(self.data_frame, image=self.red_circle).grid(row=2, column=0, ipadx=20, ipady=20)
-        # self.green = tk.Label(self.data_frame, image=self.green_circle).grid(row=2, column=1, ipadx=20, ipady=20)
-        # label.image = photo
-
-
-        # canvas_IR = tk.Canvas()
-        # canvas_US = tk.Canvas()
-        # canvas_IR.create_oval(10, 10, 80, 80, outline="black", fill="green", width=2) #.grid(row=2, column=0, ipadx=20, ipady=20)
-        # canvas_US.create_oval(110, 110, 180, 180, outline="black", fill="green", width=2) #.grid(row=2, column=1, ipadx=20, ipady=20)
-        # canvas_IR.pack(side = tk.BOTTOM)
-        # canvas_US.pack(side = tk.BOTTOM)
-
         self.data_frame.pack()
-        self.receive_msg()
-
+        self.receive_uart_msg()
 
     def select_serial_port(self, port):
         self.COM_PORT = port
@@ -127,17 +142,8 @@ class GUI:
         self.startup_frame.destroy()
         self.data_screen()
 
-
-
-
-
-
-
-
 def main():
     gui = GUI()
 
-
 if __name__ == "__main__":
-    # receive_msg()
     main()
